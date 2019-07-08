@@ -140,20 +140,6 @@ if ( hash.substr( 1, 5 ) === 'file=' ) {
 
 }
 
-// ServiceWorker
-
-if ( 'serviceWorker' in navigator ) {
-
-  try {
-
-    navigator.serviceWorker.register( 'sw.js' );
-
-  } catch ( error ) {
-
-  }
-
-}
-
 function changeImage(files) {
   editor.scene.remove(image);
   Array.from(files).forEach(file => {
