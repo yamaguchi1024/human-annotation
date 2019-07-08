@@ -179,6 +179,41 @@ function loadTexture() {
   editor.scene.add(image);
 }
 
+function calcvertexdeform(mesh, vndx) {
+  const bindMatrix = mesh.bindMatrix;
+  const bindMatrixInverse = mesh.bindMatrixInverse;
+  const geometry = new THREE.Geometry().fromBufferGeometry(mesh.geometry);;
+  const vertices = geometry.vertices;
+  const skeleton = mesh.skeleton;
+  const position = new THREE.Vector3();
+  const transformed = new THREE.Vector3();
+  const temp1 = new THREE.Vector3();
+  const tempBoneMatrix = new THREE.Matrix4();
+  const tempSkinnedVertex = new THREE.Vector3();
+  const tempSkinned = new THREE.Vector3();
+  position.copy(vertices[vndx]);
+  transformed.copy(position);
+
+  tempSkinnedVertex.copy(transformed).applyMatrix4(bindMatrix);
+  tempSkinned.set(0, 0, 0);
+
+  const skinIndices = mesh.geometry.getAttribute('skinIndex').array;
+  const skinWeights = mesh.geometry.getAttribute('skinWeight').array;
+  //console.log(mesh.geometry.getAttribute('skinIndex').array);
+
+  for (let i = 0; i < 4; ++i) {
+    const boneNdx = skinIndices[vndx*4+i];
+    const weight = skinWeights[vndx*4+i];
+    tempBoneMatrix.fromArray(skeleton.boneMatrices, boneNdx * 16);
+    temp1.copy(tempSkinnedVertex);
+    tempSkinned.add(temp1.applyMatrix4(tempBoneMatrix).multiplyScalar(weight));
+  }
+
+  transformed.copy(tempSkinned).applyMatrix4(bindMatrixInverse);
+
+  return transformed;
+}
+
 let meshes = [];
 function downloadTexture() {
   // Project to plane
@@ -192,25 +227,31 @@ function downloadTexture() {
   curContext.drawImage(textureCanvas, 0, 0);
 
   for (mesh of meshes) {
-    let geo = new THREE.Geometry().fromBufferGeometry(mesh.geometry);
-    mesh.updateMatrixWorld();
-    for (let i = 0; i < geo.vertices.length; i++) {
-      let ver = geo.vertices[i];
-      let vec = ver.clone();
+    const bindMatrix = mesh.bindMatrix;
+    const geometry = new THREE.Geometry().fromBufferGeometry(mesh.geometry);;
+    const vertices = geometry.vertices;
+
+    for (let vndx = 0; vndx < vertices.length; ++vndx) {
+      let vec;
+      if (bindMatrix == undefined) vec = vertices[vndx];
+      else vec = calcvertexdeform(mesh, vndx);
+
       vec.applyMatrix4(mesh.matrixWorld);
+
+      if (isNaN(vec.x)) continue;
+
       let x = (vec.x + planewidth/2)/planewidth;
       let y = ((planeheight - vec.y)/planeheight);
       let px = Math.floor(x*curCanvas.width);
       let py = Math.floor(y*curCanvas.height);
 
-      if (i == 0) {
+      if (vndx == 0) {
         curContext.moveTo(px, py);
         continue;
       }
       curContext.lineTo(px, py);
       curContext.stroke();
       curContext.moveTo(px, py);
-
       //const index = (px + py * curCanvas.width)*4;
       //drawPixel(image_data, index, 255, 0, 0, 255);
     }
